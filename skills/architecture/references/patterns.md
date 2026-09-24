@@ -154,8 +154,12 @@ public:
         return result == push_result::accepted;
     }
 
+    // changing the predicate without the mutex can lose the wakeup and hang join()
     void stop() {
-        _running = false;
+        {
+            const std::lock_guard<std::mutex> lock(_mutex);
+            _running = false;
+        }
         _wakeup.notify_one();
         if (_thread.joinable()) {
             _thread.join();
