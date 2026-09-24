@@ -19,6 +19,7 @@
 - Appendix A. 기존 시스템의 설계 문제
 - Appendix B. 현장 확인 항목
 - Appendix C. 미구현 항목
+- Appendix D. 원칙 예외
 
 ## 표 양식
 
@@ -87,3 +88,11 @@
 
 | Item | Status |
 | --- | --- |
+
+### Appendix D. 원칙 예외
+
+코드의 `// exception: EX-P2-001 ...` 표식과 이 표의 ID가 일치해야 한다. 해제한 예외는 지우지 말고 Status를 "released"로 바꾼다.
+
+| ID | Principle | Location | Reason | Mitigation | Approved by | Review when | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| EX-P2-001 | P2 | `network/VendorLink.cpp` | vendor sdk has no async connect | 2 s timeout, worst time in the timing table | operator, 2026-09-24 | sdk 3.0 release | active |
