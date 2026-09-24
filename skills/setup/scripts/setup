@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SOURCE_PATH="$PLUGIN_DIR/instructions/AGENTS.md"
+
+usage() {
+  echo "usage: $0 --force" >&2
+  exit 1
+}
+
+backup() {
+  local target=$1
+  local timestamp
+  local path
+  local suffix
+  timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+  path="${target}.conventions-backup.${timestamp}"
+  suffix=1
+  while [ -e "$path" ]; do
+    path="${target}.conventions-backup.${timestamp}.${suffix}"
+    suffix=$((suffix + 1))
+  done
+  cp "$target" "$path"
+  echo "백업: $path"
+}
+
+install() {
+  local target_path=$1
+  [ -f "$SOURCE_PATH" ] || {
+    echo "지침 원본을 찾을 수 없습니다: $SOURCE_PATH" >&2
+    return 1
+  }
+  [ ! -d "$target_path" ] || {
+    echo "대상 경로가 디렉터리입니다: $target_path" >&2
+    return 1
+  }
+  mkdir -p "$(dirname "$target_path")"
+  if [ -e "$target_path" ] || [ -L "$target_path" ]; then
+    [ ! -e "$target_path" ] || backup "$target_path"
+    rm -f "$target_path"
+  fi
+  cp "$SOURCE_PATH" "$target_path"
+  echo "설치: $target_path"
+}
+
+main() {
+  local codex_dir
+  local claude_dir
+  [ "$#" -eq 1 ] && [ "$1" = "--force" ] || usage
+  codex_dir=${CODEX_HOME:-"$HOME/.codex"}
+  claude_dir=${CLAUDE_CONFIG_DIR:-"$HOME/.claude"}
+  install "$codex_dir/AGENTS.md"
+  install "$claude_dir/CLAUDE.md"
+}
+
+main "$@"
