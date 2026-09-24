@@ -4,7 +4,6 @@
 
 - Personal C++ conventions for agentic development with Claude Code and Codex
 - Distributed as a plugin (`cpp-conventions@loki2001`) for both Claude Code and Codex
-- Built on the Radar Verification Tool source code policy and the MOLIT-15 integrated control software design
 - Designed for control software: components, threads, queues, device links, recovery and safety
 - <span style="color:deepskyblue; font-weight:bold">`/cpp-conventions:setup` replaces the global agent instructions (backups are kept)</span>
 - Setup script and tests require bash
