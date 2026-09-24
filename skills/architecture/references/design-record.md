@@ -6,7 +6,7 @@
 
 1. Introduction: 목적, 범위(디렉터리별 내용), 용어, 개발 환경
 2. System Context: 문맥도, 외부 인터페이스 표
-3. Architecture: 설계 원칙, 계층, 컴포넌트 모델, 스레드 모델, 메시지 흐름, 상태 관리
+3. Architecture: 설계 원칙, 계층, 컴포넌트 모델, 스레드 모델, 메시지 흐름, 상태 관리, 시간 계약
 4. Key Design Decisions: 결정마다 이유와 측정값
 5. Safety Design: 상태 기계, 전역 스위치, 시작 시 검증, 보호 기능
 6. Communication Protocols: 프레이밍 표, 주의할 점
@@ -52,6 +52,13 @@
 | Queue | Ceiling | On overflow |
 | --- | --- | --- |
 | Message bus | 4,096 | Drop oldest, log the running total |
+
+### 시간 계약
+
+측정 최악값은 WCET가 아니다. 측정 조건(빌드, 하드웨어, 부하, 측정 시간)을 함께 적는다.
+
+| Component | Period | Deadline | Handler budget | Observed worst | Conditions |
+| --- | --- | --- | --- | --- | --- |
 
 ### 상대별 감지와 복구
 
