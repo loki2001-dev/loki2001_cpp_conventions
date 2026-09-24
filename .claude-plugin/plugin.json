@@ -1,6 +1,6 @@
 {
   "name": "cpp-conventions",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "에이전트가 따를 CBD 방법론과 C++ 개발 규약을 제공하는 플러그인",
   "license": "MIT"
 }

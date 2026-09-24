@@ -21,6 +21,14 @@
 - Code Formatting: Ready-to-use <span style="color:deepskyblue; font-weight:bold">`.clang-format` and `.clang-tidy`</span> configs
 - Test Strategy: <span style="color:deepskyblue; font-weight:bold">Catch2</span> unit tests, virtual integration tests with fake devices, load and fault injection tests
 - Build Convention: <span style="color:deepskyblue; font-weight:bold">Target-based CMake</span> with Ninja and MSVC/GCC warning policy
+- Agent Decisions: Agents <span style="color:deepskyblue; font-weight:bold">ask instead of guessing</span> safety, protocol and timing values
+- Robustness: <span style="color:deepskyblue; font-weight:bold">Zero deadlock, crash and zombie</span> rules with ASan, UBSan and TSan builds
+- Enforcement: `clang-tidy` naming and `clang-analyzer-*`, <span style="color:deepskyblue; font-weight:bold">`scripts/check`</span> and a CI workflow template
+- Fuzz Testing: <span style="color:deepskyblue; font-weight:bold">libFuzzer</span> targets for codecs, frame assemblers and parsers
+- Timing Contract: Period, deadline, handler budget, jitter and throughput with <span style="color:deepskyblue; font-weight:bold">observed worst</span> values
+- Principle Exceptions: <span style="color:deepskyblue; font-weight:bold">`EX-P{n}-{nnn}`</span> markers checked against the design record
+- Security: <span style="color:deepskyblue; font-weight:bold">TLS</span>, command authentication, secrets and least privilege
+- Versioning: Protocol version checks, compatible format changes and <span style="color:deepskyblue; font-weight:bold">build info</span> in the startup log
 - Global Instructions: Installs <span style="color:deepskyblue; font-weight:bold">`instructions/AGENTS.md`</span> as `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`
 
 ---
@@ -30,10 +38,10 @@
 | Skill          | Scope                                                                 |
 | -------------- | --------------------------------------------------------------------- |
 | `cbd`          | Component-based development process, component rules, spec template   |
-| `architecture` | Principles, layers, threading, queues, codecs, recovery, safety, logs |
-| `cpp`          | Source code policy, patterns, clang-format and clang-tidy configs     |
-| `testing`      | Unit tests, virtual integration tests, load and fault injection       |
-| `cmake`        | Target-based CMake, MSVC and GCC warning policy                       |
+| `architecture` | Principles, exceptions, threading, timing, codecs, recovery, security |
+| `cpp`          | Source code policy, patterns, clang configs, check script, CI         |
+| `testing`      | Unit, fuzz, virtual integration, load and fault injection tests       |
+| `cmake`        | Target-based CMake, warnings, sanitizers, fuzzing, build info         |
 | `setup`        | Installs `instructions/AGENTS.md` globally                            |
 
 ---
@@ -42,7 +50,7 @@
 
 ### Prerequisites
 - [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex) CLI
-- bash (for the `setup` skill and its test)
+- bash (for the scripts and their tests)
 
 ---
 
@@ -76,6 +84,9 @@ codex plugin add cpp-conventions@loki2001
 ```bash
 # Verify the setup script
 skills/setup/tests/test
+
+# Verify the convention check script
+skills/cpp/tests/test
 ```
 
 ---
@@ -83,6 +94,9 @@ skills/setup/tests/test
 ## Project Structure
 ```
 loki2001_cpp_conventions/
+├── .github/workflows/
+│   └── test.yml                            # Script tests and version consistency
+│
 ├── .claude-plugin/                         # Claude Code plugin metadata
 │   ├── marketplace.json                    # Marketplace definition
 │   └── plugin.json                         # Plugin manifest
@@ -101,7 +115,7 @@ loki2001_cpp_conventions/
 │   │       └── example.md                  # CBD example
 │   │
 │   ├── architecture/                       # Architecture rules
-│   │   ├── SKILL.md                        # Principles, threading, queues, recovery
+│   │   ├── SKILL.md                        # Principles, threading, timing, security
 │   │   └── references/
 │   │       ├── design-record.md            # Design record template
 │   │       └── patterns.md                 # Architecture patterns
@@ -110,15 +124,20 @@ loki2001_cpp_conventions/
 │   │   ├── SKILL.md                        # Naming, style, pointers, errors, logs
 │   │   ├── assets/
 │   │   │   ├── .clang-format               # clang-format config
-│   │   │   └── .clang-tidy                 # clang-tidy config
-│   │   └── references/
-│   │       └── patterns.md                 # C++ patterns
+│   │   │   ├── .clang-tidy                 # clang-tidy config
+│   │   │   └── ci.yml                      # CI workflow template
+│   │   ├── references/
+│   │   │   └── patterns.md                 # C++ patterns
+│   │   ├── scripts/
+│   │   │   └── check                       # Checks what clang-tidy cannot
+│   │   └── tests/
+│   │       └── test                        # Check script test
 │   │
 │   ├── testing/                            # Test strategy
-│   │   └── SKILL.md                        # Unit, integration, load, fault injection
+│   │   └── SKILL.md                        # Unit, fuzz, integration, load, faults
 │   │
 │   ├── cmake/                              # Build convention
-│   │   └── SKILL.md                        # Target-based CMake, warning policy
+│   │   └── SKILL.md                        # Targets, sanitizers, fuzzing, version
 │   │
 │   └── setup/                              # Global instructions installer
 │       ├── SKILL.md                        # Setup skill
@@ -127,6 +146,7 @@ loki2001_cpp_conventions/
 │       └── tests/
 │           └── test                        # Setup script test
 │
+├── CHANGELOG.md
 ├── LICENSE
 └── README.md
 ```
