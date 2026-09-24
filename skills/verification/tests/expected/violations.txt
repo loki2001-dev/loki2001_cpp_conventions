@@ -1,0 +1,48 @@
+== cmake
+CMakeLists.txt:4: [CMAKE-GLOB] source files are collected with file(GLOB_RECURSE). fix: list every source file explicitly in add_library or add_executable
+CMakeLists.txt:6: [CMAKE-GLOBAL-COMMAND] include_directories() changes every target in the directory. fix: use the target form: target_include_directories, target_link_libraries, target_compile_definitions, target_compile_options or target_link_options
+CMakeLists.txt:7: [CMAKE-GLOBAL-COMMAND] add_definitions() changes every target in the directory. fix: use the target form: target_include_directories, target_link_libraries, target_compile_definitions, target_compile_options or target_link_options
+CMakeLists.txt:8: [CMAKE-GLOBAL-FLAGS] CMAKE_CXX_FLAGS sets flags for every target. fix: put the flags in a list variable and apply it with target_compile_options or target_link_options
+CMakeLists.txt:9: [CMAKE-3RDPARTY-SYSTEM] third party headers are included without SYSTEM, so the warning policy applies to them. fix: add SYSTEM: target_include_directories(bad SYSTEM PUBLIC ...)
+CMakeLists.txt:1: [CMAKE-MIN-VERSION] cmake_minimum_required(VERSION 3.10) is below 3.16. fix: use cmake_minimum_required(VERSION 3.16)
+CMakeLists.txt:1: [CMAKE-COMPILE-COMMANDS] compile_commands.json is not generated, so clang-tidy cannot run. fix: add set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+CMakeLists.txt:1: [CMAKE-WARNINGS] warning flags missing: -Wpedantic -Werror. fix: define PROJECT_WARNINGS as in the cmake skill and apply it with target_compile_options to every target
+CMakeLists.txt:13: [CMAKE-TEST-REGISTER] test executable bad_tests is not registered with add_test. fix: add add_test(NAME bad_tests COMMAND bad_tests) so that ctest --timeout runs it
+CMakeLists.txt:1: [CMAKE-ENABLE-TESTING] add_test is used but enable_testing() is missing, so ctest finds no tests. fix: call enable_testing() in the root CMakeLists.txt
+cmake: 10 violation(s) (1 files)
+== conventions
+conventions: pass (cpp skill check)
+== p1
+src/component/Bad.cpp:8: [P1-THREAD] loop-thread code creates its own thread. fix: submit blocking work to BlockingWorker in src/network and return the result with UvLoop::post
+src/component/Bad.cpp:11: [P1-LOCK] lock in loop-thread code. component code runs on one thread and needs no lock. fix: remove the lock and cross threads only through UvLoop::post or StateStore
+src/component/Bad.cpp:13: [P1-WORKER-CAPTURE] the blocking lambda passed to submit runs on the worker thread but captures this. fix: capture copies or shared_ptr values (for example [client = _client, request, response]) and touch members only in the onDone lambda
+src/component/Bad.cpp:14: [P1-WORKER-STATE] the worker thread changes component state. fix: return the result to the onDone lambda, which runs on the loop thread, and change state there
+src/component/Bad.cpp:29: [P1-WORKER-CAPTURE] the blocking lambda passed to submit runs on the worker thread but captures &. fix: capture copies or shared_ptr values (for example [client = _client, request, response]) and touch members only in the onDone lambda
+p1: 5 violation(s) (2 files)
+== p2
+src/component/Bad.cpp:4: [P2-SLEEP] sleep blocks the loop thread. fix: schedule the next step with a UvTimer, or move the call into BlockingWorker::submit
+src/component/Bad.cpp:5: [P2-WAIT] blocking wait on the loop thread. fix: deliver the result with UvLoop::post or a callback instead of waiting
+src/component/Bad.cpp:6: [P2-SOCKET] synchronous socket or file descriptor call blocks the loop thread. fix: use the non-blocking libuv transport, or run the call on a dedicated thread in src/network
+src/component/Bad.cpp:7: [P2-DNS] synchronous name resolution blocks the loop thread. fix: use uv_getaddrinfo with a callback, or resolve on a dedicated thread
+src/component/Bad.cpp:18: [P2-SLEEP] sleep blocks the loop thread. fix: schedule the next step with a UvTimer, or move the call into BlockingWorker::submit
+src/component/Bad.cpp:21: [P2-SLEEP] sleep blocks the loop thread. fix: schedule the next step with a UvTimer, or move the call into BlockingWorker::submit
+src/component/Bad.cpp:22: [P2-PROCESS] waiting for a child process blocks the loop thread. fix: use uv_spawn with an exit callback, or waitpid with WNOHANG
+src/component/Bad.cpp:23: [P2-LOOP-RUN] running a libuv loop inside loop-thread code blocks the owning loop. fix: only UvLoop::run in the app layer runs the loop. use timers and callbacks here
+src/component/Bad.cpp:24: [P2-SYNC-API] synchronous network library call on the loop thread. fix: run it on a dedicated thread in src/network and return the result with UvLoop::post
+p2: 9 violation(s) (2 files)
+== p3
+src/codec/Codec.cpp:9: [P3-UNCHECKED] external value length (read at line 6) is used as a buffer bound without a range check. fix: compare length with the remaining size or a ceiling constant and drop the frame when it is out of range, or read through FrameReader
+src/codec/Codec.cpp:20: [P3-UNCHECKED] loop index i runs up to external count count (read at line 16) and indexes a buffer without a range check. fix: compare count with the buffer capacity or a ceiling constant before the loop, or store only what was actually read
+src/codec/Codec.cpp:26: [P3-FIXED-OFFSET] fixed offset read from external buffer data before any length check. fix: read through FrameReader, or check the size before reading
+src/codec/Codec.cpp:27: [P3-UNCHECKED] external value index (read at line 26) is used as a buffer bound without a range check. fix: compare index with the remaining size or a ceiling constant and drop the frame when it is out of range, or read through FrameReader
+src/codec/Codec.cpp:36: [P3-UNCHECKED] external value slot (read at line 33) is used as a buffer bound without a range check. fix: compare slot with the remaining size or a ceiling constant and drop the frame when it is out of range, or read through FrameReader
+src/codec/Codec.cpp:37: [P3-UNCHECKED] external value slot (read at line 33) is used as a buffer bound without a range check. fix: compare slot with the remaining size or a ceiling constant and drop the frame when it is out of range, or read through FrameReader
+p3: 6 violation(s) (4 files)
+== p5
+src/core/Queues.cpp:9: [P5-PUSH-IGNORED] push result of bounded queue _silentQueue is ignored, so overflow is silent. fix: check the push_result: log dropped_total for drop_oldest, or return the rejection to the caller
+src/core/Queues.cpp:10: [P5-DROP-NOT-LOGGED] drop_oldest queue _dropQueue drops without a log. fix: when push does not return push_result::accepted, LOG_WARN the running dropped_total
+src/core/Queues.h:8: [P5-UNBOUNDED] member queue _unbounded (std::deque) has no capacity check. fix: use BoundedQueue<T>(capacity, overflow_policy::drop_oldest or reject), or compare _unbounded.size() with a capacity before pushing and count the drops
+src/core/Queues.h:9: [P5-UNBOUNDED] member queue _tasks (std::queue) has no capacity check. fix: use BoundedQueue<T>(capacity, overflow_policy::drop_oldest or reject), or compare _tasks.size() with a capacity before pushing and count the drops
+p5: 4 violation(s) (4 files)
+==
+verify: fail (cmake p1 p2 p3 p5). fix every finding above and run verify.sh again

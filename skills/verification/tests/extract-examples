@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# writes the cpp and cmake code blocks of the skill documents into a project tree.
+# a block right after a line like `src/core/UvLoop.h` goes to that path. other cpp blocks go to
+# src/component/examples/ so that the strictest loop-thread checks apply to them. the cmake block
+# with cmake_minimum_required becomes CMakeLists.txt, the others go to cmake/
+#
+# usage: extract-examples OUTPUT-DIR
+set -euo pipefail
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+
+main() {
+  local output=${1:-}
+  local document
+  local skill
+  [ -n "$output" ] || {
+    echo "usage: $0 OUTPUT-DIR" >&2
+    exit 2
+  }
+  mkdir -p "$output"
+  cp "$PLUGIN_DIR/skills/cpp/assets/.clang-format" "$PLUGIN_DIR/skills/cpp/assets/.clang-tidy" "$output/"
+  for document in "$PLUGIN_DIR"/skills/*/SKILL.md "$PLUGIN_DIR"/skills/*/references/*.md; do
+    skill=${document#"$PLUGIN_DIR"/skills/}
+    skill=${skill%%/*}
+    awk -v output="$output" -v name="$skill-$(basename "$document" .md)" '
+      function target(language,    path) {
+        count++
+        if (language == "cpp" && hint != "") {
+          path = hint
+        } else if (language == "cpp") {
+          path = "src/component/examples/" name "-" count ".cpp"
+        } else {
+          path = "cmake/" name "-" count ".cmake"
+        }
+        if (path in used) {
+          path = path "." count
+        }
+        used[path] = 1
+        return output "/" path
+      }
+      /^```(cpp|cmake)[ \t]*$/ && file == "" {
+        language = substr($0, 4)
+        sub(/[ \t]*$/, "", language)
+        file = target(language)
+        lines = ""
+        next
+      }
+      /^```/ && file != "" {
+        if (language == "cmake" && index(lines, "cmake_minimum_required") > 0) {
+          file = output "/CMakeLists.txt"
+        }
+        directory = file
+        sub(/\/[^\/]*$/, "", directory)
+        system("mkdir -p \"" directory "\"")
+        printf "%s", lines > file
+        close(file)
+        file = ""
+        next
+      }
+      file != "" {
+        lines = lines $0 "\n"
+        next
+      }
+      /^`[A-Za-z0-9_\/.]+`[ \t]*$/ {
+        hint = $0
+        gsub(/[` \t]/, "", hint)
+        next
+      }
+      /[^ \t]/ {
+        hint = ""
+      }
+    ' "$document"
+  done
+}
+
+main "$@"

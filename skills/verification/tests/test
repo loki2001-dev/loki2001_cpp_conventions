@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -euo pipefail
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+TESTS_DIR="$PLUGIN_DIR/skills/verification/tests"
+SCRIPTS_DIR="$PLUGIN_DIR/skills/verification/scripts"
+VERIFY="$SCRIPTS_DIR/verify.sh"
+CLANG_FORMAT=${CLANG_FORMAT:-clang-format}
+TEST_TEMP_DIR=
+
+cleanup() {
+  [ -z "$TEST_TEMP_DIR" ] || rm -rf "$TEST_TEMP_DIR"
+}
+
+fail() {
+  echo "실패: $1" >&2
+  exit 1
+}
+
+# copies a fixture into the temp directory with the cpp skill .clang-format
+fixture() {
+  local name=$1
+  local target="$TEST_TEMP_DIR/$name"
+  rm -rf "$target"
+  cp -r "$TESTS_DIR/fixtures/$name" "$target"
+  cp "$PLUGIN_DIR/skills/cpp/assets/.clang-format" "$target/"
+  echo "$target"
+}
+
+expect_finding() {
+  local output=$1
+  local finding=$2
+  grep -q -F "$finding" <<< "$output" || fail "검출 누락: $finding"
+}
+
+test_violations() {
+  local root
+  local output
+  root=$(fixture violations)
+  if output=$("$VERIFY" --skip commit,tidy,format "$root"); then
+    fail "위반 fixture 통과"
+  fi
+  diff -u "$TESTS_DIR/expected/violations.txt" <(echo "$output") > /dev/null || {
+    diff -u "$TESTS_DIR/expected/violations.txt" <(echo "$output") >&2 || true
+    fail "위반 fixture 출력"
+  }
+}
+
+test_clean() {
+  local root
+  root=$(fixture clean)
+  "$VERIFY" --skip commit,tidy,format "$root" > /dev/null || {
+    "$VERIFY" --skip commit,tidy,format "$root" >&2 || true
+    fail "정상 fixture"
+  }
+  touch "$root/CMakeCache.txt"
+  expect_finding "$("$SCRIPTS_DIR/check_cmake.sh" "$root" || true)" "[CMAKE-IN-SOURCE]"
+}
+
+test_format() {
+  local root
+  local output
+  if ! command -v "$CLANG_FORMAT" > /dev/null 2>&1; then
+    echo "건너뜀: $CLANG_FORMAT 없음, 형식 시험"
+    return
+  fi
+  root=$(fixture clean)
+  "$SCRIPTS_DIR/check_format.sh" "$root" > /dev/null || fail "형식 정상 fixture"
+  printf 'int  main( ){return 0;}\n' > "$root/src/Unformatted.cpp"
+  output=$("$SCRIPTS_DIR/check_format.sh" "$root" || true)
+  expect_finding "$output" "src/Unformatted.cpp:1: [FORMAT]"
+  rm "$root/.clang-format"
+  expect_finding "$("$SCRIPTS_DIR/check_format.sh" "$root" || true)" "[FORMAT-CONFIG]"
+}
+
+commit() {
+  git -C "$1" -c user.name=test -c user.email=test@example.com commit -q --allow-empty -m "$2"
+}
+
+test_commit() {
+  local repo="$TEST_TEMP_DIR/commits"
+  local message="$TEST_TEMP_DIR/message"
+  local output
+  git init -q "$repo"
+  commit "$repo" "Initial commit"
+  commit "$repo" "add: provide verification skill"
+  commit "$repo" "refactor!: rename vms config keys"
+  commit "$repo" "Update readme"
+  commit "$repo" "docs: Update readme"
+  output=$("$SCRIPTS_DIR/check_commit.sh" --all "$repo" || true)
+  expect_finding "$output" "subject \"Update readme\" does not start with"
+  expect_finding "$output" "[COMMIT-CASE] subject \"docs: Update readme\""
+  expect_finding "$output" "commit: 2 violation(s) (5 commits in HEAD)"
+  "$SCRIPTS_DIR/check_commit.sh" --range HEAD~3..HEAD~2 "$repo" > /dev/null || fail "커밋 범위"
+  printf 'fix: guard stop predicate\n\nBody With Capitals\n' > "$message"
+  "$SCRIPTS_DIR/check_commit.sh" --message-file "$message" > /dev/null || fail "커밋 메시지 파일"
+  printf 'feat: new thing\n' > "$message"
+  ! "$SCRIPTS_DIR/check_commit.sh" --message-file "$message" > /dev/null || fail "커밋 메시지 형식"
+}
+
+# the code blocks of the skill documents are the reference patterns and must pass
+test_examples() {
+  local root="$TEST_TEMP_DIR/examples"
+  local skip=commit,tidy
+  "$TESTS_DIR/extract-examples" "$root"
+  command -v "$CLANG_FORMAT" > /dev/null 2>&1 || skip=$skip,format
+  "$VERIFY" --skip "$skip" "$root" > /dev/null || {
+    "$VERIFY" --skip "$skip" "$root" >&2 || true
+    fail "문서 예제"
+  }
+}
+
+test_usage() {
+  local status=0
+  "$VERIFY" --only bogus "$TEST_TEMP_DIR" > /dev/null 2>&1 || status=$?
+  [ "$status" -eq 2 ] || fail "인수 검사"
+}
+
+main() {
+  TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/verification.XXXXXX")
+  trap cleanup EXIT
+  test_violations
+  test_clean
+  test_format
+  test_commit
+  test_examples
+  test_usage
+  echo "검증 완료"
+}
+
+main "$@"
