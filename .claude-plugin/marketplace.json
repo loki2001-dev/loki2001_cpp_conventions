@@ -1,0 +1,24 @@
+{
+  "name": "loki2001",
+  "owner": {
+    "name": "loki2001-dev",
+    "url": "https://github.com/loki2001-dev"
+  },
+  "description": "Codex 및 Claude Code 환경에서 함께 사용하는 C++ 개발 규약",
+  "plugins": [
+    {
+      "name": "cpp-conventions",
+      "source": "./",
+      "description": "에이전트가 따를 CBD 방법론과 C++ 개발 규약을 제공하는 플러그인",
+      "version": "0.2.0",
+      "author": {
+        "name": "loki2001-dev",
+        "url": "https://github.com/loki2001-dev"
+      },
+      "homepage": "https://github.com/loki2001-dev/loki2001_cpp_conventions",
+      "repository": "https://github.com/loki2001-dev/loki2001_cpp_conventions",
+      "license": "MIT",
+      "category": "Productivity"
+    }
+  ]
+}
