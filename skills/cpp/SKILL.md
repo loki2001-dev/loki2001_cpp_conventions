@@ -66,16 +66,24 @@ description: C++ 작업에 소스 코드 작성 정책을 적용한다. .h, .cpp
 - 원시 포인터는 소유하지 않는 참조와 libuv 콜백에서만 사용하라
 - 바이트 버퍼는 포인터와 길이를 따로 넘기지 말고 `ByteView`로 넘겨라
 - 자원은 생성자에서 획득하고 소멸자에서 해제하라 (RAII)
+- 핸들, 스레드, 버퍼를 소유하는 클래스는 복사 생성자와 복사 대입을 `= delete`하라. 복사되면 같은 자원을 두 번 해제한다
+- `ByteView`와 원시 포인터는 소유하지 않는다. 원본보다 오래 보관하지 말고, 임시 객체에서 만들어 반환하지 마라
+- 반복 중인 컨테이너를 반복 안에서(콜백을 통해서도) 바꾸지 마라. 반복자가 무효화된다
 
 #### 인터페이스와 콜백
 - 인터페이스는 `virtual ~IName() = default;`와 순수 가상 함수만으로 정의하라
 - 구현 클래스의 재정의에는 `override`를 붙여라
 - 콜백은 `std::function` 멤버를 모은 콜백 구조체에 `[this]` 람다를 대입하는 방식으로 연결하라
+- `std::function` 콜백은 호출 전에 비었는지 확인하라: `if (callbacks.onError) { callbacks.onError(error); }`
+- 나중에 실행되는 람다(`post()`, 타이머, 전용 스레드, 버스 구독)는 대상 객체가 람다보다 오래 살 때만 `[this]`로 캡처하라. 보장할 수 없으면 `std::weak_ptr`로 캡처하고 `lock()`으로 확인하라
+- 나중에 실행되는 람다에서 `[&]`와 지역 변수 참조 캡처를 사용하지 마라
 
 #### 에러 처리와 로깅
 - 성공과 실패는 `bool`로 반환하고, 실패 시 `LOG_ERROR`를 남긴 뒤 `false`를 반환하라
 - 비동기 에러는 `notify_error(code, message)`로 콜백에 통지하라
 - 전제 조건이 맞지 않으면 조기 반환하라
+- 소멸자, `stop()`, `shutdown()`에서 예외를 던지지 마라
+- 스레드 함수와 콜백(libuv, 전용 스레드 작업) 밖으로 예외를 내보내지 마라. 스레드에서 잡히지 않은 예외는 `std::terminate`로 프로세스를 끝내고, C 콜백을 통과하는 예외는 정의되지 않은 동작이다. 경계에서 잡아 `LOG_ERROR`로 기록하라
 - 스마트 포인터는 `if (_ptr)`, 원시 포인터는 `if (ptr != nullptr)`로 확인하라
 - 로그는 `LOG_DEBUG`, `LOG_INFO`, `LOG_WARN`, `LOG_ERROR`만 사용하고, 첫 두 인수로 장치 태그와 분류 태그를 넘겨라
 - 로그 내용은 영어 소문자 동사구 뒤에 `key=value`로 값을 붙여라: `LOG_ERROR(vms, net, "connect failed code={} message={}", code, message)`
@@ -93,6 +101,8 @@ description: C++ 작업에 소스 코드 작성 정책을 적용한다. .h, .cpp
 - C 스타일 캐스트를 사용하지 마라: `static_cast`, `reinterpret_cast`, `const_cast`를 사용하라
 - 매직 넘버를 사용하지 마라: 이름 있는 `constexpr` 상수로 정의하라
 - 전역 변수를 사용하지 마라
+- `std::thread::detach()`를 사용하지 마라
+- 락, 스레드 정지 순서, 자식 프로세스 규칙은 `architecture` 스킬의 "동기화와 수명", "프로세스와 비정상 종료"를 따르라
 
 #### libuv 예외
 - libuv 요청 객체(`uv_connect_t`, `uv_write_t` 등)는 C API에 넘겨야 하므로 `new`로 생성할 수 있다

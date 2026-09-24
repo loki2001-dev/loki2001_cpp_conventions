@@ -1,6 +1,6 @@
 ---
 name: cmake
-description: CMake 작업에 빌드 컨벤션을 적용한다. CMakeLists.txt나 .cmake 파일이나 빌드 스크립트를 작성하거나 수정할 때, 타깃이나 의존 라이브러리나 컴파일 옵션이나 시험 타깃을 추가할 때 반드시 사용한다.
+description: CMake 작업에 빌드 컨벤션을 적용한다. CMakeLists.txt나 .cmake 파일이나 빌드 스크립트를 작성하거나 수정할 때, 타깃이나 의존 라이브러리나 컴파일 옵션이나 시험 타깃이나 새니타이저 구성을 추가할 때 반드시 사용한다.
 ---
 
 ### CMake
@@ -56,4 +56,42 @@ add_executable(st1_tests
 )
 target_link_libraries(st1_tests PRIVATE st1_core Catch2::Catch2WithMain)
 target_compile_options(st1_tests PRIVATE ${PROJECT_WARNINGS})
+```
+
+### 새니타이저
+- 메모리 오류(SIGSEGV, use-after-free, 이중 해제)와 데이터 경쟁, 교착을 잡기 위해 새니타이저 구성을 둬라
+- `PROJECT_SANITIZER` 캐시 변수로 고르고, 모든 타깃에 타깃 기반 명령으로 붙여라
+  - `address`: AddressSanitizer + UndefinedBehaviorSanitizer
+  - `thread`: ThreadSanitizer. `address`와 함께 쓸 수 없으므로 빌드 디렉터리를 따로 둬라
+- GCC와 Clang에서 사용하라. MSVC는 `/fsanitize=address`만 지원한다
+- 배포 산출물은 새니타이저 없이 `Release`로 빌드하라
+- 새니타이저 경고는 억제하지 말고 고쳐라. 서드파티 코드에서 나는 경고만 억제 파일에 이유와 함께 등록하라
+
+```cmake
+set(PROJECT_SANITIZER "" CACHE STRING "empty, address or thread")
+
+set(PROJECT_SANITIZER_FLAGS)
+if(PROJECT_SANITIZER STREQUAL "address")
+  set(PROJECT_SANITIZER_FLAGS -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
+elseif(PROJECT_SANITIZER STREQUAL "thread")
+  set(PROJECT_SANITIZER_FLAGS -fsanitize=thread -fno-omit-frame-pointer)
+elseif(NOT PROJECT_SANITIZER STREQUAL "")
+  message(FATAL_ERROR "unknown PROJECT_SANITIZER=${PROJECT_SANITIZER}")
+endif()
+
+target_compile_options(st1_core PRIVATE ${PROJECT_SANITIZER_FLAGS})
+foreach(target st1 st1_tests)
+  target_compile_options(${target} PRIVATE ${PROJECT_SANITIZER_FLAGS})
+  target_link_options(${target} PRIVATE ${PROJECT_SANITIZER_FLAGS})
+endforeach()
+```
+
+```bash
+cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPROJECT_SANITIZER=address
+cmake --build build-asan
+ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 ./build-asan/st1_tests
+
+cmake -S . -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPROJECT_SANITIZER=thread
+cmake --build build-tsan
+TSAN_OPTIONS=halt_on_error=1 ./build-tsan/st1_tests
 ```
