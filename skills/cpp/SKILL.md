@@ -108,6 +108,7 @@ description: C++ 작업에 소스 코드 작성 정책을 적용한다. .h, .cpp
 - libuv 요청 객체(`uv_connect_t`, `uv_write_t` 등)는 C API에 넘겨야 하므로 `new`로 생성할 수 있다
 - 이 객체는 반드시 완료 콜백의 첫머리에서 `delete`하라
 - libuv 콜백은 `static` 함수로 정의하고 `data` 필드에서 `static_cast`로 객체를 복원하라
+- libuv 핸들(`uv_tcp_t`, `uv_timer_t` 등)과 그 핸들을 담은 객체의 메모리는 `uv_close` 완료 콜백이 불린 뒤에만 해제하라. `uv_close` 직후에 해제하면 루프가 해제된 메모리를 읽는다
 
 #### 상세 예시
 - 콜백, 인터페이스, 에러 통지, 로깅, RAII, libuv, 스레드, 테스트 함수의 전체 예시는 `references/patterns.md`를 읽어라
