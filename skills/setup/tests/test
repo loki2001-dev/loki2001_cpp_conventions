@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SETUP="$PLUGIN_DIR/skills/setup/scripts/setup"
+SOURCE_PATH="$PLUGIN_DIR/instructions/AGENTS.md"
+TEST_TEMP_DIR=
+
+cleanup() {
+  [ -z "$TEST_TEMP_DIR" ] || rm -rf "$TEST_TEMP_DIR"
+}
+
+fail() {
+  echo "실패: $1" >&2
+  exit 1
+}
+
+main() {
+  local codex_dir
+  local claude_dir
+  TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/cpp-conventions.XXXXXX")
+  trap cleanup EXIT
+  codex_dir="$TEST_TEMP_DIR/codex"
+  claude_dir="$TEST_TEMP_DIR/claude"
+  mkdir -p "$codex_dir" "$claude_dir"
+  printf 'old codex\n' > "$codex_dir/AGENTS.md"
+  printf 'old claude\n' > "$claude_dir/CLAUDE.md"
+  CODEX_HOME="$codex_dir" CLAUDE_CONFIG_DIR="$claude_dir" "$SETUP" --force > /dev/null
+  cmp -s "$SOURCE_PATH" "$codex_dir/AGENTS.md" || fail "Codex 지침"
+  cmp -s "$SOURCE_PATH" "$claude_dir/CLAUDE.md" || fail "Claude 지침"
+  find "$codex_dir" -name 'AGENTS.md.conventions-backup.*' -type f | grep -q . || fail "Codex 백업"
+  find "$claude_dir" -name 'CLAUDE.md.conventions-backup.*' -type f | grep -q . || fail "Claude 백업"
+  rm -rf "$codex_dir" "$claude_dir"
+  CODEX_HOME="$codex_dir" CLAUDE_CONFIG_DIR="$claude_dir" "$SETUP" --force > /dev/null
+  [ -f "$claude_dir/CLAUDE.md" ] || fail "신규 설치"
+  ! "$SETUP" > /dev/null 2>&1 || fail "인수 검사"
+  echo "검증 완료"
+}
+
+main "$@"
