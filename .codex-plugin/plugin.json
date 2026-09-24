@@ -1,0 +1,36 @@
+{
+  "name": "cpp-conventions",
+  "version": "0.2.0",
+  "description": "에이전트가 따를 C++ 개발 규약을 제공하는 플러그인",
+  "author": {
+    "name": "loki2001-dev",
+    "url": "https://github.com/loki2001-dev"
+  },
+  "homepage": "https://github.com/loki2001-dev/loki2001_cpp_conventions",
+  "repository": "https://github.com/loki2001-dev/loki2001_cpp_conventions",
+  "license": "MIT",
+  "keywords": [
+    "규약",
+    "C++",
+    "CBD",
+    "컴포넌트",
+    "아키텍처",
+    "시험",
+    "CMake",
+    "에이전트"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "C++ 개발 규약",
+    "shortDescription": "CBD 방법론과 C++ 개발 규약",
+    "longDescription": "Codex 및 Claude Code 환경에서 함께 사용하는 CBD 방법론, 아키텍처 규칙, C++ 코드 규약, 시험 전략을 제공합니다.",
+    "developerName": "loki2001-dev",
+    "category": "Productivity",
+    "capabilities": [
+      "Write"
+    ],
+    "defaultPrompt": [
+      "C++ 코드 작업에 개발 규약을 적용해 주세요."
+    ]
+  }
+}
