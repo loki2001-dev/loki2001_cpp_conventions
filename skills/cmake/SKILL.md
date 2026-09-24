@@ -1,6 +1,6 @@
 ---
 name: cmake
-description: CMake 작업에 빌드 컨벤션을 적용한다. CMakeLists.txt나 .cmake 파일이나 빌드 스크립트를 작성하거나 수정할 때, 타깃이나 의존 라이브러리나 컴파일 옵션이나 시험 타깃이나 새니타이저 구성을 추가할 때 반드시 사용한다.
+description: CMake 작업에 빌드 컨벤션을 적용한다. CMakeLists.txt나 .cmake 파일이나 빌드 스크립트를 작성하거나 수정할 때, 타깃이나 의존 라이브러리나 컴파일 옵션이나 시험 타깃이나 새니타이저나 퍼징 구성을 추가할 때 반드시 사용한다.
 ---
 
 ### CMake
@@ -98,4 +98,44 @@ ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 ctest --test-dir build-asan --outpu
 cmake -S . -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPROJECT_SANITIZER=thread
 cmake --build build-tsan
 TSAN_OPTIONS=halt_on_error=1 ctest --test-dir build-tsan --output-on-failure --timeout 300
+```
+
+### 퍼징
+- 외부 바이트를 받는 함수(코덱, 프레임 조립, 파서)는 libFuzzer 대상으로 빌드하라 (`testing` 스킬의 퍼징)
+- `PROJECT_FUZZ` 옵션으로 켜고, Clang으로만 빌드하라. 퍼징 빌드는 자체 새니타이저를 쓰므로 `PROJECT_SANITIZER`와 함께 켜지 마라
+- 퍼즈 대상의 이름은 `fuzz_{snake_case}`, 소스는 `tests/fuzz/{ClassName}Fuzz.cpp`로 둬라
+- 퍼즈 대상은 배포 산출물에 포함하지 마라
+
+```cmake
+option(PROJECT_FUZZ "build libFuzzer targets, clang only" OFF)
+
+if(PROJECT_FUZZ)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "PROJECT_FUZZ requires clang")
+  endif()
+  if(NOT PROJECT_SANITIZER STREQUAL "")
+    message(FATAL_ERROR "PROJECT_FUZZ sets its own sanitizers. leave PROJECT_SANITIZER empty")
+  endif()
+  set(PROJECT_FUZZ_FLAGS -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
+  target_compile_options(st1_core PRIVATE -fsanitize=fuzzer-no-link ${PROJECT_FUZZ_FLAGS})
+  foreach(target st1 st1_tests)
+    target_link_options(${target} PRIVATE ${PROJECT_FUZZ_FLAGS})
+  endforeach()
+
+  function(add_fuzz_target name source)
+    add_executable(${name} ${source})
+    target_link_libraries(${name} PRIVATE st1_core)
+    target_compile_options(${name} PRIVATE -fsanitize=fuzzer ${PROJECT_FUZZ_FLAGS})
+    target_link_options(${name} PRIVATE -fsanitize=fuzzer ${PROJECT_FUZZ_FLAGS})
+  endfunction()
+
+  add_fuzz_target(fuzz_perception_codec tests/fuzz/PerceptionCodecFuzz.cpp)
+endif()
+```
+
+```bash
+cmake -S . -B build-fuzz -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DPROJECT_FUZZ=ON
+cmake --build build-fuzz
+./build-fuzz/fuzz_perception_codec -max_total_time=60 -artifact_prefix=build-fuzz/ tests/fuzz/corpus/fuzz_perception_codec
 ```

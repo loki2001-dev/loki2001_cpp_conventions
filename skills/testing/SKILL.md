@@ -1,6 +1,6 @@
 ---
 name: testing
-description: 제어 소프트웨어의 시험 전략을 적용한다. 단위 시험(Catch2)이나 가상 통합 시험을 작성하거나 고칠 때, 가짜 장치(시뮬레이터)를 만들 때, 부하 시험이나 장애 주입 시험을 설계할 때, 교착이나 비정상 종료나 좀비 프로세스나 새니타이저 결과를 판정할 때, 시험 판정 기준이나 현장 확인 항목을 정할 때 반드시 사용한다.
+description: 제어 소프트웨어의 시험 전략을 적용한다. 단위 시험(Catch2)이나 가상 통합 시험을 작성하거나 고칠 때, 가짜 장치(시뮬레이터)를 만들 때, 부하 시험이나 장애 주입 시험이나 퍼징을 설계할 때, 교착이나 비정상 종료나 좀비 프로세스나 새니타이저 결과를 판정할 때, 시험 판정 기준이나 현장 확인 항목을 정할 때 반드시 사용한다.
 ---
 
 # 시험 전략
@@ -10,6 +10,7 @@ description: 제어 소프트웨어의 시험 전략을 적용한다. 단위 시
 | 수준 | 대상 | 도구 |
 | --- | --- | --- |
 | 단위 | 코덱 경계, 상태 기계 전이, 범위 검사, 큐 넘침, 설정 파싱 | Catch2. 실행 파일에 포함하지 않는다 |
+| 퍼징 | 코덱, 프레임 조립, 설정과 화면 메시지 파서 | libFuzzer(Clang) + ASan + UBSan |
 | 가상 통합 | 실제 실행 파일 하나 + 가짜 상대 장치 전부 | `simulation/`의 스크립트 |
 | 현장 | 가상 시험이 다룰 수 없는 것 | 설계 문서의 현장 확인 항목 |
 
@@ -27,6 +28,33 @@ TEST_CASE("FrameReader rejects a read past the end") {
     FrameReader reader(ByteView(bytes, sizeof(bytes)));
     uint16_t value = 0;
     REQUIRE_FALSE(reader.readU16Be(value));
+}
+```
+
+- 스레드 경계를 넘는 클래스(`UvLoop::post()`, `BlockingWorker`, `StateSlot`, 락을 쓰는 큐)는 여러 스레드가 동시에 반복 호출하는 스트레스 시험을 두고 `thread` 빌드에서 실행하라
+
+## 퍼징
+
+- 외부에서 바이트를 받는 모든 함수를 퍼즈 대상으로 만들어라: 코덱 해석, `FrameReader`, 스트림 프레임 조립기, 설정 파서, 화면 메시지 해석
+- 대상마다 `tests/fuzz/{ClassName}Fuzz.cpp`에 `LLVMFuzzerTestOneInput` 하나를 둬라 (`cmake` 스킬의 퍼징)
+- 퍼즈 대상은 결정적이어야 한다. 시각, 난수, 소켓, 파일, 전역 상태를 쓰지 말고, 로그는 오류 수준만 남겨라
+- 스트림 조립기는 입력을 여러 조각으로 나눠 넣어 조각 경계에서의 재동기를 시험하라
+- 시드 코퍼스로 명세의 예시 프레임과 현장에서 캡처한 프레임을 `tests/fuzz/corpus/{target}/`에 커밋하라
+- 퍼징으로 찾은 크래시 입력은 단위 시험으로 옮겨 회귀 시험으로 남기고, 코퍼스에도 추가하라
+- CI에서는 대상마다 60초씩 돌리고, 더 긴 실행(예: 1시간)은 야간 작업으로 돌려라
+
+```cpp
+#include <cstddef>
+#include <cstdint>
+
+#include "codec/PerceptionCodec.h"
+#include "model/ByteView.h"
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    PerceptionCodec codec;
+    perception_header header{};
+    codec.parseHeader(ByteView(data, size), header);
+    return 0;
 }
 ```
 
