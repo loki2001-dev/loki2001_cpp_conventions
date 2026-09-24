@@ -51,37 +51,181 @@
 ## Getting Started
 
 ### Prerequisites
-- [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex) CLI
-- bash, POSIX awk and git (for the scripts and their tests)
-- clang-format and clang-tidy (optional, for the `format` and `tidy` verification checks)
+
+| Tool | Needed for | Linux | Windows |
+| ---- | ---------- | ----- | ------- |
+| [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) or [Codex](https://github.com/openai/codex) CLI | Running the plugin | Required | Required |
+| git | Plugin install, `commit` check | Required | Git for Windows (includes Git Bash) |
+| bash, POSIX awk | `setup` and `verification` scripts | Preinstalled on most distributions | Git Bash (bundled with Git for Windows) |
+| Node.js 18 or later | Installing Codex with npm | Codex only | Codex only |
+| clang-format, clang-tidy | `format` and `tidy` checks | Optional | Optional (LLVM) |
+
+On Windows, run the plugin scripts in **Git Bash**, not in PowerShell or cmd. The repository keeps LF line endings (`.gitattributes`), so the scripts run as checked out.
 
 ---
 
 ## Install Instructions
 
-### Claude Code
-```bash
-# Add the marketplace
-claude plugin marketplace add loki2001-dev/loki2001_cpp_conventions
+The steps are the same for Claude Code and Codex except where noted. Install either CLI, or both.
 
-# Install the plugin
-claude plugin install cpp-conventions@loki2001
+### Linux
+
+The commands are for Ubuntu 22.04 and 24.04. Use the equivalent package names on other distributions. awk is preinstalled (mawk on Ubuntu) and is enough for the scripts.
+
+**1. Install the tools**
+```bash
+sudo apt-get update
+sudo apt-get install -y git curl
+
+# Optional: clang-format and clang-tidy for the format and tidy checks
+sudo apt-get install -y clang-format clang-tidy
+
+# Codex only: Node.js 18 or later (skip if node --version already prints v18 or later)
+# Ubuntu 24.04 packages Node.js 18. Ubuntu 22.04 packages an older one, so install it from https://nodejs.org instead
+sudo apt-get install -y nodejs npm
 ```
 
-### Codex
+**2. Install the agent CLI**
 ```bash
-# Add the marketplace
-codex plugin marketplace add loki2001-dev/loki2001_cpp_conventions
+# Claude Code (native installer)
+curl -fsSL https://claude.ai/install.sh | bash
+claude --version
 
-# Install the plugin
+# Codex
+npm install -g @openai/codex
+codex --version
+```
+Sign in once by running `claude` or `codex` and following the prompt.
+
+**3. Add the marketplace and install the plugin**
+```bash
+# Claude Code
+claude plugin marketplace add loki2001-dev/loki2001_cpp_conventions
+claude plugin install cpp-conventions@loki2001
+
+# Codex
+codex plugin marketplace add loki2001-dev/loki2001_cpp_conventions
 codex plugin add cpp-conventions@loki2001
 ```
 
-### Global Instructions
-```bash
-# Replace global agent instructions (backups are kept)
+**4. Install the global instructions**
+
+Start a new session (`claude` or `codex`) and run:
+```text
 /cpp-conventions:setup
 ```
+The agent explains that the global instructions will be replaced and asks for approval. After approval it writes:
+
+| Agent | File |
+| ----- | ---- |
+| Codex | `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md`) |
+| Claude Code | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`) |
+
+An existing file is kept next to it as `AGENTS.md.conventions-backup.<UTC time>` or `CLAUDE.md.conventions-backup.<UTC time>`.
+
+**5. Check the installation**
+```bash
+ls -l ~/.claude/CLAUDE.md ~/.codex/AGENTS.md
+```
+Open a new session. The instructions are read when a session starts. In Claude Code, `/plugin` lists the installed plugin and its skills.
+
+**6. Optional: clone the repository to run the tests or `verify.sh` by hand**
+```bash
+git clone https://github.com/loki2001-dev/loki2001_cpp_conventions.git
+cd loki2001_cpp_conventions
+skills/verification/scripts/verify.sh /path/to/your/project
+```
+
+### Windows
+
+Choose where the agent runs and follow that path only.
+
+- **Native Windows** (PowerShell terminal): follow the steps below. Git Bash runs the scripts, and files go to `C:\Users\<name>\.claude` and `C:\Users\<name>\.codex`.
+- **WSL**: open the WSL terminal and follow the [Linux](#linux) steps. Files go to the WSL home directory, which native Windows agents do not read.
+
+**1. Install the tools** (PowerShell)
+```powershell
+winget install --id Git.Git -e
+
+# Optional: clang-format and clang-tidy for the format and tidy checks
+winget install --id LLVM.LLVM -e
+
+# Codex only: Node.js LTS
+winget install --id OpenJS.NodeJS.LTS -e
+```
+Close and reopen PowerShell so that the new `PATH` applies. Check with `git --version`.
+
+**2. Install the agent CLI** (PowerShell)
+```powershell
+# Claude Code (native installer). It uses Git Bash from Git for Windows
+irm https://claude.ai/install.ps1 | iex
+claude --version
+
+# Codex
+npm install -g @openai/codex
+codex --version
+```
+Sign in once by running `claude` or `codex`. See the [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) and [Codex](https://github.com/openai/codex) documentation for the current Windows support and requirements.
+
+**3. Add the marketplace and install the plugin** (PowerShell)
+```powershell
+# Claude Code
+claude plugin marketplace add loki2001-dev/loki2001_cpp_conventions
+claude plugin install cpp-conventions@loki2001
+
+# Codex
+codex plugin marketplace add loki2001-dev/loki2001_cpp_conventions
+codex plugin add cpp-conventions@loki2001
+```
+
+**4. Install the global instructions**
+
+Start a new session and run `/cpp-conventions:setup`, as on Linux. Claude Code runs the script through Git Bash.
+
+If the agent cannot run bash scripts, run the setup yourself in **Git Bash**:
+```bash
+git clone https://github.com/loki2001-dev/loki2001_cpp_conventions.git
+cd loki2001_cpp_conventions
+skills/setup/scripts/setup --force
+```
+
+| Agent | File |
+| ----- | ---- |
+| Codex | `%USERPROFILE%\.codex\AGENTS.md` (or `%CODEX_HOME%\AGENTS.md`) |
+| Claude Code | `%USERPROFILE%\.claude\CLAUDE.md` (or `%CLAUDE_CONFIG_DIR%\CLAUDE.md`) |
+
+**5. Check the installation** (PowerShell)
+```powershell
+Test-Path "$env:USERPROFILE\.claude\CLAUDE.md"
+Test-Path "$env:USERPROFILE\.codex\AGENTS.md"
+```
+Both print `True` for the agents you set up. Open a new session so that the instructions are read.
+
+**6. Optional: run `verify.sh` by hand** (Git Bash)
+```bash
+cd /c/path/to/loki2001_cpp_conventions
+skills/verification/scripts/verify.sh /c/path/to/your/project
+```
+Git Bash writes Windows drives as `/c/...`. `format` and `tidy` run only when LLVM is on `PATH`, otherwise they report `skipped`.
+
+### Restore the previous global instructions
+
+The setup replaces the whole file. To go back, copy the backup over it (Linux or Git Bash):
+```bash
+ls ~/.claude/CLAUDE.md.conventions-backup.*
+cp ~/.claude/CLAUDE.md.conventions-backup.<UTC time> ~/.claude/CLAUDE.md
+```
+The same applies to `~/.codex/AGENTS.md`.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| ------- | ----- | --- |
+| `$'\r': command not found` or `bad interpreter` | The scripts have CRLF endings (a copy made before `.gitattributes` was added, or an editor converted them) | Clone the repository again, or reinstall the plugin |
+| `claude` or `codex` not found after install | `PATH` is not refreshed | Open a new terminal. On Windows, reopen PowerShell |
+| `awk: command not found` on Windows | The script runs in PowerShell or cmd | Run it in Git Bash |
+| `format: error: clang-format not found` | LLVM is not installed or not on `PATH` | Install clang-format, or set `CLANG_FORMAT` to its full path |
+| Rules are not applied in a session | The session started before the setup | Start a new session |
 
 ### Test
 ```bash
