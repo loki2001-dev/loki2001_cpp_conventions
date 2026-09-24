@@ -91,6 +91,28 @@ skills/cpp/tests/test
 
 ---
 
+## Using in a Project
+Copy these files from the plugin into a C++ project that has none yet.
+
+| Plugin file                       | Project path                  |
+| --------------------------------- | ----------------------------- |
+| `skills/cpp/assets/.clang-format` | `.clang-format`               |
+| `skills/cpp/assets/.clang-tidy`   | `.clang-tidy`                 |
+| `skills/cpp/scripts/check`        | `tools/check-conventions`     |
+| `skills/cpp/assets/ci.yml`        | `.github/workflows/ci.yml`    |
+
+```bash
+# Run the checks locally
+clang-format --dry-run --Werror $(git ls-files '*.cpp' '*.h')
+cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+clang-tidy -p build $(git ls-files '*.cpp')
+tools/check-conventions .
+cmake --build build
+ctest --test-dir build --output-on-failure --timeout 300
+```
+
+---
+
 ## Project Structure
 ```
 loki2001_cpp_conventions/
@@ -161,32 +183,40 @@ loki2001_cpp_conventions/
 │                                                                             │
 │   ┌──────────────────────┐                                                  │
 │   │  Global Instructions │  ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md         │
-│   │  (instructions/      │  installed by /cpp-conventions:setup             │
-│   │   AGENTS.md)         │                                                  │
+│   │  (ask before         │  installed by /cpp-conventions:setup             │
+│   │   guessing values)   │                                                  │
 │   └──────────┬───────────┘                                                  │
 │              │                                                              │
 │              ▼                                                              │
 │   ┌──────────────────────┐    ┌──────────────────────┐                      │
 │   │  cbd                 │───▶│  architecture        │                      │
-│   │  (Components, specs, │    │  (Threads, queues,   │                      │
-│   │   assembly order)    │    │   codecs, recovery)  │                      │
+│   │  (Components, specs, │    │  (Threads, timing,   │                      │
+│   │   timing contract)   │    │   security, recovery)│                      │
 │   └──────────────────────┘    └──────────┬───────────┘                      │
 │                                          │                                  │
 │                    ┌─────────────────────┼─────────────────────┐            │
 │                    ▼                     ▼                     ▼            │
 │         ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐    │
 │         │  cpp             │  │  cmake           │  │  testing         │    │
-│         │  (Source code    │  │  (Targets,       │  │  (Catch2, fake   │    │
-│         │   policy)        │  │   warnings)      │  │   devices, load) │    │
-│         └──────────────────┘  └──────────────────┘  └──────────────────┘    │
+│         │  (Source code    │  │  (Sanitizers,    │  │  (Catch2, fuzz,  │    │
+│         │   policy, check) │  │   fuzz, version) │  │   fake devices)  │    │
+│         └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘    │
+│                  └─────────────────────┼─────────────────────┘              │
+│                                        ▼                                    │
+│         ┌────────────────────────────────────────────────────────────┐      │
+│         │  CI gate (assets/ci.yml)                                   │      │
+│         │  format, clang-tidy, check, Release, ASan, TSan, fuzz      │      │
+│         └────────────────────────────────────────────────────────────┘      │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 Order of Application:
-1. cbd: Specify components and interfaces before writing code
-2. architecture: Apply design principles, threading, queues and recovery rules
-3. cpp / cmake: Write sources and build scripts by the convention
-4. testing: Verify with unit, virtual integration, load and fault injection tests
+1. AGENTS.md: Ask before guessing safety, protocol and timing values
+2. cbd: Specify components, interfaces and timing contracts before writing code
+3. architecture: Apply principles, threading, timing, security and recovery rules
+4. cpp / cmake: Write sources and build scripts by the convention
+5. testing: Verify with unit, fuzz, virtual integration, load and fault injection tests
+6. CI gate: Merge only when format, static analysis, check, sanitizer and fuzz jobs pass
 ```
 
 ---
