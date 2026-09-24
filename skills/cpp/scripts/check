@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT=${1:-.}
+
+usage() {
+  echo "usage: $0 [project-root]" >&2
+  exit 2
+}
+
+list_files() {
+  local pattern
+  if git -C "$ROOT" rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+    git -C "$ROOT" ls-files --cached --others --exclude-standard -- "$@"
+  else
+    for pattern in "$@"; do
+      (cd "$ROOT" && find . -type f -name "$pattern" | sed 's|^\./||')
+    done
+  fi | grep -v -E '^(3rdparty|build[^/]*)/' || true
+}
+
+own_header() {
+  local path=$1
+  local name
+  name="$(basename "${path%.cpp}").h"
+  if grep -q -E "(^|/)${name}\$" <<< "$HEADERS"; then
+    echo "$name"
+  fi
+}
+
+check_file() {
+  local path=$1
+  local kind=${path##*.}
+  local own=
+  [ "$kind" != "cpp" ] || own=$(own_header "$path")
+  awk -v file="$path" -v kind="$kind" -v own="$own" '
+    BEGIN {
+      split("cassert cctype cerrno cfenv cfloat cinttypes climits clocale cmath csetjmp csignal cstdarg cstddef cstdint cstdio cstdlib cstring ctime cuchar cwchar cwctype", names, " ")
+      for (i in names) {
+        cHeader[names[i]] = 1
+      }
+    }
+    function report(message) {
+      printf "%s:%d: %s\n", file, FNR, message
+      failed = 1
+    }
+    /^[ \t]*$/ || /^[ \t]*(\/\/|\/\*|\*)/ {
+      commentLine = 1
+    }
+    !commentLine && !seenCode {
+      seenCode = 1
+      if (kind == "h" && $0 !~ /^[ \t]*#[ \t]*pragma[ \t]+once/) {
+        report("header must start with #pragma once")
+      }
+    }
+    /^[ \t]*#[ \t]*include[ \t]*[<"]/ {
+      line = $0
+      sub(/^[ \t]*#[ \t]*include[ \t]*/, "", line)
+      quote = substr(line, 1, 1)
+      name = substr(line, 2)
+      sub(/[>"].*$/, "", name)
+      includeCount++
+      base = name
+      sub(/^.*\//, "", base)
+      if (kind == "cpp" && includeCount == 1 && own != "" && base != own) {
+        report("first include must be the own header " own)
+      }
+      if (kind == "cpp" && includeCount == 1 && base == own) {
+        ownInclude = 1
+      } else if (quote == "\"" && index(name, "/") > 0) {
+        seenProject = 1
+      } else if (quote == "<" && seenProject) {
+        report("system or external header after project header: " name)
+      }
+      if (kind == "cpp" && quote == "<") {
+        if (name in cHeader) {
+          if (seenCxx) {
+            report("C system header after C++ system header: " name)
+          }
+        } else if (index(name, ".") == 0) {
+          seenCxx = 1
+        }
+      }
+    }
+    /\.detach[ \t]*\([ \t]*\)/ && !commentLine {
+      report("std::thread::detach() is forbidden")
+    }
+    /NOLINTEND/ {
+      if ($0 !~ /NOLINTEND\([^)]+\)/) {
+        report("NOLINTEND must name the checks")
+      }
+    }
+    /NOLINT/ && !/NOLINTEND/ {
+      if ($0 !~ /NOLINT(NEXTLINE|BEGIN)?\([^)]+\)[ \t]+[^ \t]/) {
+        report("NOLINT must name the checks and give a reason")
+      }
+    }
+    /exception:[ \t]*EX-P[1-5]-[0-9][0-9][0-9]/ {
+      match($0, /EX-P[1-5]-[0-9][0-9][0-9]/)
+      id = substr($0, RSTART, RLENGTH)
+      rest = substr($0, RSTART + RLENGTH)
+      if (rest !~ /[^ \t*\/]/) {
+        report("exception marker " id " must give a reason")
+      }
+      printf "MARKER %s %s:%d\n", id, file, FNR
+    }
+    {
+      commentLine = 0
+    }
+    END {
+      exit failed
+    }
+  ' "$ROOT/$path"
+}
+
+main() {
+  local sources
+  local path
+  local output
+  local failed=0
+  local defined
+  local id
+  local location
+  [ -d "$ROOT" ] || usage
+  HEADERS=$(list_files '*.h')
+  sources=$(list_files '*.h' '*.cpp')
+  defined=$(list_files '*.md' | while read -r path; do
+    grep -o -E 'EX-P[1-5]-[0-9]{3}' "$ROOT/$path" || true
+  done | sort -u)
+  while read -r path; do
+    [ -n "$path" ] || continue
+    output=$(check_file "$path") || failed=1
+    while read -r line; do
+      case "$line" in
+        "") ;;
+        MARKER\ *)
+          read -r _ id location <<< "$line"
+          if ! grep -q -x "$id" <<< "$defined"; then
+            echo "$location: exception marker $id is not listed in the design document"
+            failed=1
+          fi
+          ;;
+        *) echo "$line" ;;
+      esac
+    done <<< "$output"
+  done <<< "$sources"
+  if [ "$failed" -ne 0 ]; then
+    return 1
+  fi
+  echo "check passed"
+}
+
+main "$@"

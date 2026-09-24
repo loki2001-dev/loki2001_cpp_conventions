@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+set -euo pipefail
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CHECK="$PLUGIN_DIR/skills/cpp/scripts/check"
+TEST_TEMP_DIR=
+
+cleanup() {
+  [ -z "$TEST_TEMP_DIR" ] || rm -rf "$TEST_TEMP_DIR"
+}
+
+fail() {
+  echo "실패: $1" >&2
+  exit 1
+}
+
+write_good_project() {
+  local root=$1
+  mkdir -p "$root/src/network" "$root/docs"
+  cat > "$root/src/network/TcpSocket.h" << 'EOF'
+// tcp socket
+#pragma once
+
+#include <memory>
+
+#include <uv.h>
+
+#include "model/ByteView.h"
+EOF
+  cat > "$root/src/network/TcpSocket.cpp" << 'EOF'
+#include "network/TcpSocket.h"
+
+#include <cstring>
+
+#include <memory>
+
+#include <uv.h>
+#include "imgui.h"
+
+#include "core/UvLoop.h"
+
+namespace {
+constexpr int PORT = 8088;  // NOLINT(readability-magic-numbers) port from the device manual 3.1
+}  // namespace
+
+void TcpSocket::connect() {
+    uv_run(loop, UV_RUN_NOWAIT);  // exception: EX-P2-001 vendor library has no async api
+}
+EOF
+  printf '| EX-P2-001 | P2 | TcpSocket | vendor library | worker | 2026-12 |\n' > "$root/docs/design.md"
+}
+
+expect_failure() {
+  local root=$1
+  local message=$2
+  local output
+  if output=$("$CHECK" "$root" 2>&1); then
+    fail "검출 누락: $message"
+  fi
+  grep -q -F "$message" <<< "$output" || fail "메시지 누락: $message"
+}
+
+main() {
+  local root
+  TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/cpp-check.XXXXXX")
+  trap cleanup EXIT
+  root="$TEST_TEMP_DIR/project"
+
+  write_good_project "$root"
+  "$CHECK" "$root" > /dev/null || fail "정상 프로젝트"
+
+  write_good_project "$root"
+  sed -i '/#pragma once/d' "$root/src/network/TcpSocket.h"
+  expect_failure "$root" "header must start with #pragma once"
+
+  write_good_project "$root"
+  sed -i '1i #include <string>' "$root/src/network/TcpSocket.cpp"
+  expect_failure "$root" "first include must be the own header TcpSocket.h"
+
+  write_good_project "$root"
+  printf '#include <vector>\n' >> "$root/src/network/TcpSocket.cpp"
+  expect_failure "$root" "system or external header after project header: vector"
+
+  write_good_project "$root"
+  sed -i 's|#include <cstring>|#include <memory>\n#include <cstring>|' "$root/src/network/TcpSocket.cpp"
+  expect_failure "$root" "C system header after C++ system header: cstring"
+
+  write_good_project "$root"
+  printf 'void run() {\n    worker.detach();\n}\n' >> "$root/src/network/TcpSocket.cpp"
+  expect_failure "$root" "std::thread::detach() is forbidden"
+
+  write_good_project "$root"
+  printf 'int value = 7;  // NOLINT\n' >> "$root/src/network/TcpSocket.cpp"
+  expect_failure "$root" "NOLINT must name the checks and give a reason"
+
+  write_good_project "$root"
+  printf 'int value = 7;  // NOLINT(readability-magic-numbers)\n' >> "$root/src/network/TcpSocket.cpp"
+  expect_failure "$root" "NOLINT must name the checks and give a reason"
+
+  write_good_project "$root"
+  printf '// exception: EX-P1-002 shared buffer\n' >> "$root/src/network/TcpSocket.cpp"
+  expect_failure "$root" "exception marker EX-P1-002 is not listed in the design document"
+
+  write_good_project "$root"
+  printf '// exception: EX-P2-001\n' >> "$root/src/network/TcpSocket.cpp"
+  expect_failure "$root" "exception marker EX-P2-001 must give a reason"
+
+  ! "$CHECK" "$TEST_TEMP_DIR/missing" > /dev/null 2>&1 || fail "인수 검사"
+  echo "검증 완료"
+}
+
+main "$@"

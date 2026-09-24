@@ -114,18 +114,28 @@ description: C++ 작업에 소스 코드 작성 정책을 적용한다. .h, .cpp
 - 콜백, 인터페이스, 에러 통지, 로깅, RAII, libuv, 스레드, 테스트 함수의 전체 예시는 `references/patterns.md`를 읽어라
 - 컴포넌트 구조는 `cbd` 스킬, 스레드와 큐와 프레임 검사와 설정은 `architecture` 스킬, 시험은 `testing` 스킬을 함께 적용하라
 
-#### 검사
-- 프로젝트에 설정 파일이 없으면 이 스킬의 `assets/.clang-format`과 `assets/.clang-tidy`를 프로젝트 루트에 복사하라
+#### 검사와 CI
+- 프로젝트에 없으면 이 스킬의 파일을 복사하라
+  - `assets/.clang-format`, `assets/.clang-tidy`: 프로젝트 루트
+  - `scripts/check`: `tools/check-conventions`
+  - `assets/ci.yml`: `.github/workflows/ci.yml`
 - 다음 검사를 통과하라
 
 ```bash
 clang-format --dry-run --Werror $(git ls-files '*.cpp' '*.h')
-cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 clang-tidy -p build $(git ls-files '*.cpp')
+tools/check-conventions .
 cmake --build build
+ctest --test-dir build --output-on-failure --timeout 300
 ```
 
-- `clang-tidy`가 검사하지 못하는 항목(메서드 이름, 구조체 이름, include 묶음 순서)은 직접 확인하라
+- `clang-tidy`는 네이밍(메서드의 `get_`/`set_`/`notify_`/`on_`/`TDD_` 포함), 널 역참조와 누수 경로(`clang-analyzer-*`), 금지 사항을 검사한다
+- `tools/check-conventions`는 헤더의 `#pragma once`, 구현 파일의 자기 헤더 우선, include 묶음 순서, `detach()`, 이유 없는 `NOLINT`, 설계 문서에 없는 예외 표식을 검사한다
+- 도구가 검사하지 못하는 항목(콜백 구조체 필드 이름, 값 타입과 클래스의 구분, 프로젝트 헤더의 의존성 순서)은 직접 확인하라
+- CI 통과는 병합 조건이다. 형식, 정적 분석, 규약 검사, `Release` 시험, 새니타이저 시험, 퍼징이 모두 통과해야 병합하라
+- 검사를 통과시키려고 검사를 끄거나 경고 수준을 낮추지 마라. 억제가 꼭 필요하면 검사 이름과 이유를 적어라: `// NOLINT(readability-magic-numbers) opcode from the device manual 4.2`
+- GitHub Actions가 아닌 CI나 Windows(MSVC) 빌드만 있는 프로젝트는 같은 단계를 그 CI 문법으로 옮겨라
 
 #### 기준 형태
 

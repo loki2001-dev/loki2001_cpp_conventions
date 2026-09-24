@@ -17,6 +17,7 @@ description: CMake 작업에 빌드 컨벤션을 적용한다. CMakeLists.txt나
 - 서드파티 라이브러리는 `3rdparty/`에 버전을 고정해서 커밋하라. 패키지 관리자에 의존하지 마라
 - 서드파티 헤더는 `SYSTEM`으로 추가해서 경고 정책이 서드파티 코드에 걸리지 않게 하라
 - 시험 타깃(Catch2)은 별도 실행 파일로 만들고 배포 산출물에 포함하지 마라
+- 시험 실행 파일은 `add_test`로 등록하고 `ctest --timeout`으로 실행하라. 제한 시간을 넘긴 시험은 교착으로 판정한다 (`testing` 스킬)
 - `compile_commands.json`을 생성하라
 - 헤더를 고친 뒤 증분 빌드 결과가 의심되면 다시 빌드하라. 헤더 의존성이 기록되지 않으면 오래된 오브젝트가 링크된다
 - 다음 형태를 기준으로 삼아라
@@ -56,6 +57,9 @@ add_executable(st1_tests
 )
 target_link_libraries(st1_tests PRIVATE st1_core Catch2::Catch2WithMain)
 target_compile_options(st1_tests PRIVATE ${PROJECT_WARNINGS})
+
+enable_testing()
+add_test(NAME st1_tests COMMAND st1_tests)
 ```
 
 ### 새니타이저
@@ -89,9 +93,9 @@ endforeach()
 ```bash
 cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPROJECT_SANITIZER=address
 cmake --build build-asan
-ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 ./build-asan/st1_tests
+ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 ctest --test-dir build-asan --output-on-failure --timeout 300
 
 cmake -S . -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPROJECT_SANITIZER=thread
 cmake --build build-tsan
-TSAN_OPTIONS=halt_on_error=1 ./build-tsan/st1_tests
+TSAN_OPTIONS=halt_on_error=1 ctest --test-dir build-tsan --output-on-failure --timeout 300
 ```
