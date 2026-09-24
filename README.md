@@ -6,7 +6,7 @@
 - Distributed as a plugin (`cpp-conventions@loki2001`) for both Claude Code and Codex
 - Designed for control software: components, threads, queues, device links, recovery and safety
 - <span style="color:deepskyblue; font-weight:bold">`/cpp-conventions:setup` replaces the global agent instructions (backups are kept)</span>
-- Setup script and tests require bash
+- Scripts require bash, POSIX awk and git
 
 ---
 
@@ -52,7 +52,8 @@
 
 ### Prerequisites
 - [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex) CLI
-- bash (for the scripts and their tests)
+- bash, POSIX awk and git (for the scripts and their tests)
+- clang-format and clang-tidy (optional, for the `format` and `tidy` verification checks)
 
 ---
 
@@ -114,6 +115,17 @@ clang-tidy -p build $(git ls-files '*.cpp')
 tools/check-conventions .
 cmake --build build
 ctest --test-dir build --output-on-failure --timeout 300
+```
+
+Agents run the verification skill after every implementation. It can also be run by hand from the plugin directory.
+
+```bash
+# Every check: format, cmake, commit, conventions, tidy, p1, p2, p3, p5
+skills/verification/scripts/verify.sh /path/to/project
+
+# Selected checks, or the commits of a pull request
+skills/verification/scripts/verify.sh --only p2,p3 /path/to/project
+skills/verification/scripts/verify.sh --range origin/main..HEAD /path/to/project
 ```
 
 ---
@@ -221,6 +233,12 @@ loki2001_cpp_conventions/
 │         └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘    │
 │                  └─────────────────────┼─────────────────────┘              │
 │                                        ▼                                    │
+│         ┌────────────────────────────────────────────────────────────┐      │
+│         │  verification (scripts/verify.sh)                          │      │
+│         │  format, cmake, commit, check, tidy, P1, P2, P3, P5        │      │
+│         │  fix every finding before reporting the work as done       │      │
+│         └─────────────────────────────┬──────────────────────────────┘      │
+│                                       ▼                                     │
 │         ┌────────────────────────────────────────────────────────────┐      │
 │         │  CI gate (assets/ci.yml)                                   │      │
 │         │  format, clang-tidy, check, Release, ASan, TSan, fuzz      │      │
