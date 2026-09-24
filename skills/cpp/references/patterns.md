@@ -239,8 +239,7 @@ constexpr int DEFAULT_TEST_TIMEOUT_MS = 5000;
 void TDD_ensureDisconnected();
 bool TDD_waitForTcpConnection(int timeoutMs = DEFAULT_TEST_TIMEOUT_MS);
 bool TDD_waitForFullDisconnection(int timeoutMs = DEFAULT_TEST_TIMEOUT_MS);
-void TDD_runConnectionTests(const std::string& tcpIp, int tcpPort,
-                            const std::string& udpIp, int udpPort,
+void TDD_runConnectionTests(const std::string& tcpIp, int tcpPort, const std::string& udpIp, int udpPort,
                             int repeatCounts);
 ```
 

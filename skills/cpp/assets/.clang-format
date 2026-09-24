@@ -27,4 +27,4 @@ NamespaceIndentation: None
 IncludeBlocks: Preserve
 SortIncludes: Never
 AllowShortEnumsOnASingleLine: false
-BreakTemplateDeclarations: Yes
+AlwaysBreakTemplateDeclarations: Yes
