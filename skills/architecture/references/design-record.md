@@ -8,7 +8,7 @@
 2. System Context: 문맥도, 외부 인터페이스 표
 3. Architecture: 설계 원칙, 계층, 컴포넌트 모델, 스레드 모델, 메시지 흐름, 상태 관리, 시간 계약
 4. Key Design Decisions: 결정마다 이유와 측정값
-5. Safety Design: 상태 기계, 전역 스위치, 시작 시 검증, 보호 기능
+5. Safety and Security Design: 상태 기계, 전역 스위치, 시작 시 검증, 보호 기능, 상대별 인증과 암호화, 비밀 값 보관, 실행 권한
 6. Communication Protocols: 프레이밍 표, 주의할 점
 7. Failure Detection and Recovery: 상대별 감지와 복구 표
 8. Logging: 형식, 태그, 보존 정책
