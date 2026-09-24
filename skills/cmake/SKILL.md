@@ -1,6 +1,6 @@
 ---
 name: cmake
-description: CMake 작업에 빌드 컨벤션을 적용한다. CMakeLists.txt나 .cmake 파일이나 빌드 스크립트를 작성하거나 수정할 때, 타깃이나 의존 라이브러리나 컴파일 옵션이나 시험 타깃이나 새니타이저나 퍼징 구성을 추가할 때 반드시 사용한다.
+description: CMake 작업에 빌드 컨벤션을 적용한다. CMakeLists.txt나 .cmake 파일이나 빌드 스크립트를 작성하거나 수정할 때, 타깃이나 의존 라이브러리나 컴파일 옵션이나 시험 타깃이나 새니타이저나 퍼징이나 버전 정보 구성을 추가할 때 반드시 사용한다.
 ---
 
 ### CMake
@@ -24,7 +24,7 @@ description: CMake 작업에 빌드 컨벤션을 적용한다. CMakeLists.txt나
 
 ```cmake
 cmake_minimum_required(VERSION 3.16)
-project(st1 LANGUAGES C CXX)
+project(st1 VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -138,4 +138,36 @@ cmake -S . -B build-fuzz -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DPROJECT_FUZZ=ON
 cmake --build build-fuzz
 ./build-fuzz/fuzz_perception_codec -max_total_time=60 -artifact_prefix=build-fuzz/ tests/fuzz/corpus/fuzz_perception_codec
+```
+
+### 버전과 빌드 정보
+- 제품 버전은 `project(VERSION)` 한 곳에만 둬라. 소스, 설정 파일, 문서에 버전을 따로 적지 마라
+- 버전, 커밋, 빌드 구성은 `configure_file`로 생성한 `app/BuildInfo.h`에서 읽어라
+- 커밋은 `git describe --dirty`로 얻어라. 커밋하지 않은 변경이 있는 빌드는 `-dirty`가 붙는다
+- 커밋 값은 구성 시점에 정해진다. 릴리스 빌드는 새로 구성한 빌드 디렉터리에서 만들고, `-dirty` 빌드를 배포하지 마라
+- 다중 구성 생성기(Visual Studio)에서는 `CMAKE_BUILD_TYPE`이 비어 있으므로 Ninja로 빌드하라
+
+`src/app/BuildInfo.h.in`
+
+```cpp
+#pragma once
+
+constexpr const char* BUILD_VERSION = "@PROJECT_VERSION@";
+constexpr const char* BUILD_COMMIT = "@PROJECT_COMMIT@";
+constexpr const char* BUILD_TYPE = "@CMAKE_BUILD_TYPE@";
+```
+
+```cmake
+execute_process(
+  COMMAND git describe --always --dirty --abbrev=12
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE PROJECT_COMMIT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+if(NOT PROJECT_COMMIT)
+  set(PROJECT_COMMIT unknown)
+endif()
+configure_file(src/app/BuildInfo.h.in ${CMAKE_BINARY_DIR}/generated/app/BuildInfo.h @ONLY)
+target_include_directories(st1_core PUBLIC ${CMAKE_BINARY_DIR}/generated)
 ```

@@ -485,12 +485,18 @@ private:
 
 ```cpp
 constexpr uint16_t PERCEPTION_MAX_BODY_LENGTH = 8192;
+constexpr uint8_t PERCEPTION_PROTOCOL_VERSION = 1;
 
 bool PerceptionCodec::parseHeader(ByteView frame, perception_header& header) {
     FrameReader reader(frame);
     uint16_t length = 0;
     if (!reader.readU8(header.version) || !reader.readU16Be(length) || !reader.readU8(header.opcode)) {
         LOG_WARN(radar, prot, "dropped reason=short_header size={}", frame.get_size());
+        return false;
+    }
+    if (header.version != PERCEPTION_PROTOCOL_VERSION) {
+        LOG_WARN(radar, prot, "dropped reason=unsupported_version version={} expected={}", header.version,
+                 PERCEPTION_PROTOCOL_VERSION);
         return false;
     }
     if (length > PERCEPTION_MAX_BODY_LENGTH) {
