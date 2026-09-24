@@ -10,10 +10,16 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: setup
         run: skills/setup/tests/test
       - name: check
         run: skills/cpp/tests/test
+      - name: verification
+        run: skills/verification/tests/test
+      - name: verify repository
+        run: skills/verification/scripts/verify.sh --all-commits .
       - name: version
         run: |
           versions=$(jq -r '.version' .claude-plugin/plugin.json .codex-plugin/plugin.json
