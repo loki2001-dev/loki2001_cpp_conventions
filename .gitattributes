@@ -1,0 +1,2 @@
+# scripts run under bash on every platform, including git bash on windows. keep lf endings
+* text=auto eol=lf
