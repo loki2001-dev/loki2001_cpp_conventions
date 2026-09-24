@@ -29,6 +29,7 @@
 - Principle Exceptions: <span style="color:deepskyblue; font-weight:bold">`EX-P{n}-{nnn}`</span> markers checked against the design record
 - Security: <span style="color:deepskyblue; font-weight:bold">TLS</span>, command authentication, secrets and least privilege
 - Versioning: Protocol version checks, compatible format changes and <span style="color:deepskyblue; font-weight:bold">build info</span> in the startup log
+- Verification: <span style="color:deepskyblue; font-weight:bold">`verify.sh`</span> checks format, CMake policy, commit messages and P1, P2, P3, P5 with `file:line: [RULE] reason. fix: direction` output
 - Global Instructions: Installs <span style="color:deepskyblue; font-weight:bold">`instructions/AGENTS.md`</span> as `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`
 
 ---
@@ -42,6 +43,7 @@
 | `cpp`          | Source code policy, patterns, clang configs, check script, CI         |
 | `testing`      | Unit, fuzz, virtual integration, load and fault injection tests       |
 | `cmake`        | Target-based CMake, warnings, sanitizers, fuzzing, build info         |
+| `verification` | Automatic checks: format, CMake, commits, P1, P2, P3, P5              |
 | `setup`        | Installs `instructions/AGENTS.md` globally                            |
 
 ---
@@ -87,6 +89,9 @@ skills/setup/tests/test
 
 # Verify the convention check script
 skills/cpp/tests/test
+
+# Verify the verification skill
+skills/verification/tests/test
 ```
 
 ---
@@ -161,6 +166,19 @@ loki2001_cpp_conventions/
 │   ├── cmake/                              # Build convention
 │   │   └── SKILL.md                        # Targets, sanitizers, fuzzing, version
 │   │
+│   ├── verification/                       # Automatic convention checks
+│   │   ├── SKILL.md                        # Rules, detection, exceptions, fixes
+│   │   ├── scripts/
+│   │   │   ├── verify.sh                   # Runs every check
+│   │   │   ├── check_*.sh, check_*.awk     # format, cmake, commit, p1, p2, p3, p5
+│   │   │   ├── common.awk                  # Shared awk functions
+│   │   │   └── lib.sh                      # Shared shell functions
+│   │   └── tests/
+│   │       ├── test                        # Fixture and example tests
+│   │       ├── extract-examples            # Writes skill code blocks to a project
+│   │       ├── expected/                   # Expected output for the violations
+│   │       └── fixtures/                   # violations/ and clean/ projects
+│   │
 │   └── setup/                              # Global instructions installer
 │       ├── SKILL.md                        # Setup skill
 │       ├── scripts/
@@ -216,7 +234,8 @@ Order of Application:
 3. architecture: Apply principles, threading, timing, security and recovery rules
 4. cpp / cmake: Write sources and build scripts by the convention
 5. testing: Verify with unit, fuzz, virtual integration, load and fault injection tests
-6. CI gate: Merge only when format, static analysis, check, sanitizer and fuzz jobs pass
+6. verification: Run verify.sh and fix every finding before reporting the work as done
+7. CI gate: Merge only when format, static analysis, check, sanitizer and fuzz jobs pass
 ```
 
 ---

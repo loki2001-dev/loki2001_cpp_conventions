@@ -2,6 +2,13 @@
 
 Breaking changes are marked with **Breaking**. The version must match the three plugin manifests.
 
+## Unreleased
+
+- `verification` skill: `verify.sh` runs clang-format, CMake policy, commit message, convention, clang-tidy and P1, P2, P3, P5 checks and prints `file:line: [RULE] reason. fix: direction`
+- Agents apply the verification skill and resolve every failure before reporting completion
+- Fix: `.clang-format` used `BreakTemplateDeclarations`, which clang-format 18 (Ubuntu 24.04, the CI template) rejects. It now uses `AlwaysBreakTemplateDeclarations`
+- Fix: the test helper example in `cpp` patterns was not clang-formatted
+
 ## 0.3.0
 
 - Agent decision and clarification rules: ask instead of guessing safety, protocol and timing values
